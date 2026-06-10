@@ -68,18 +68,6 @@ packages:
   - ltrace
   - cppcheck
 
-  # Common C++ development libraries
-  - libboost-all-dev
-  - libssl-dev
-  - zlib1g-dev
-  - libcurl4-openssl-dev
-  - libfmt-dev
-  - libspdlog-dev
-  - libgtest-dev
-  - libgmock-dev
-  - libbenchmark-dev
-  - nlohmann-json3-dev
-
   # Version control and dev utilities
   - git
   - git-lfs
@@ -109,31 +97,6 @@ packages:
 # Files
 # ---------------------------------------------------------------------------
 write_files:
-  # A minimal CMake starter project so the box is immediately usable.
-  - path: /home/dev/hello/CMakeLists.txt
-    owner: dev:dev
-    permissions: "0644"
-    content: |
-      cmake_minimum_required(VERSION 3.20)
-      project(hello LANGUAGES CXX)
-
-      set(CMAKE_CXX_STANDARD 20)
-      set(CMAKE_CXX_STANDARD_REQUIRED ON)
-      set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-
-      add_executable(hello main.cpp)
-
-  - path: /home/dev/hello/main.cpp
-    owner: dev:dev
-    permissions: "0644"
-    content: |
-      #include <iostream>
-
-      int main() {
-          std::cout << "Hello from the C++ devbox!\n";
-          return 0;
-      }
-
   # Sensible C++/build-tool defaults in the dev user's shell.
   - path: /home/dev/.bash_aliases
     owner: dev:dev
@@ -154,15 +117,8 @@ write_files:
 # Commands run on first boot (after packages are installed)
 # ---------------------------------------------------------------------------
 runcmd:
-  # GoogleTest ships as source on Debian/Ubuntu; build and install the libs so
-  # find_package(GTest) works out of the box.
-  - [ bash, -c, "cd /usr/src/googletest && cmake -B build && cmake --build build && cmake --install build" ]
-
   # fd is installed as 'fdfind' on Ubuntu; provide the conventional 'fd' name.
   - [ bash, -c, "ln -sf $(command -v fdfind) /usr/local/bin/fd || true" ]
-
-  # Make sure the starter project is owned by the dev user.
-  - [ chown, -R, "dev:dev", /home/dev/hello ]
 
   # Report the installed toolchain versions to the cloud-init log.
   - [ bash, -c, "g++ --version; clang++ --version; cmake --version; ninja --version" ]
@@ -171,6 +127,4 @@ runcmd:
 # Final message printed when cloud-init finishes.
 # ---------------------------------------------------------------------------
 final_message: |
-  C++ devbox is ready after $UPTIME seconds.
-  Log in as 'dev' and try:
-    cd ~/hello && cmake -B build && cmake --build build && ./build/hello
+  C++ devbox is ready after $UPTIME seconds. Log in as 'dev' to get started.
