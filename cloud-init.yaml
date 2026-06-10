@@ -1,0 +1,176 @@
+#cloud-config
+#
+# Cloud-init configuration for an Ubuntu 24.04 LTS (Noble Numbat) C++ devbox.
+#
+# Usage examples:
+#   - Pass via --user-data when launching a cloud VM (AWS, GCP, Azure, etc.)
+#   - multipass launch 24.04 --name cpp-dev --cloud-init cloud-init.yaml
+#   - As the user-data drive for a local QEMU/libvirt instance
+#
+# Adjust the `users` section (especially `ssh_authorized_keys`) before use.
+
+# Keep the apt package cache fresh and pull in security updates on first boot.
+package_update: true
+package_upgrade: true
+
+# Set the hostname for the box.
+hostname: cpp-devbox
+prefer_fqdn_over_hostname: false
+
+# ---------------------------------------------------------------------------
+# Users
+# ---------------------------------------------------------------------------
+# Create a non-root developer account with passwordless sudo. Replace the
+# placeholder SSH key with your own public key (cat ~/.ssh/id_ed25519.pub).
+users:
+  - name: dev
+    gecos: Developer
+    groups: [sudo]
+    shell: /bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    lock_passwd: true
+    ssh_authorized_keys:
+      - ssh-ed25519 AAAA...REPLACE_WITH_YOUR_PUBLIC_KEY... user@example.com
+
+# ---------------------------------------------------------------------------
+# Packages
+# ---------------------------------------------------------------------------
+# A practical C++ toolchain: compilers, build systems, debuggers, analysis
+# tooling, and common development libraries.
+packages:
+  # Core build toolchain
+  - build-essential          # gcc, g++, make, libc headers
+  - g++
+  - gcc
+  - clang
+  - clang-tools              # scan-build, clang-check, etc.
+  - clang-format
+  - clang-tidy
+  - clangd
+  - lldb
+  - lld                      # LLVM linker
+
+  # Build systems / package managers
+  - cmake
+  - ninja-build
+  - make
+  - autoconf
+  - automake
+  - libtool
+  - pkg-config
+  - meson
+
+  # Debugging / profiling / analysis
+  - gdb
+  - valgrind
+  - linux-tools-common
+  - strace
+  - ltrace
+  - cppcheck
+
+  # Common C++ development libraries
+  - libboost-all-dev
+  - libssl-dev
+  - zlib1g-dev
+  - libcurl4-openssl-dev
+  - libfmt-dev
+  - libspdlog-dev
+  - libgtest-dev
+  - libgmock-dev
+  - libbenchmark-dev
+  - nlohmann-json3-dev
+
+  # Version control and dev utilities
+  - git
+  - git-lfs
+  - ccache                   # speeds up recompiles
+  - curl
+  - wget
+  - unzip
+  - zip
+  - tar
+  - tree
+  - htop
+  - tmux
+  - vim
+  - neovim
+  - ripgrep
+  - fd-find
+  - jq
+  - ca-certificates
+  - gnupg
+  - lsb-release
+  - software-properties-common
+  - python3
+  - python3-pip
+  - python3-venv
+
+# ---------------------------------------------------------------------------
+# Files
+# ---------------------------------------------------------------------------
+write_files:
+  # A minimal CMake starter project so the box is immediately usable.
+  - path: /home/dev/hello/CMakeLists.txt
+    owner: dev:dev
+    permissions: "0644"
+    content: |
+      cmake_minimum_required(VERSION 3.20)
+      project(hello LANGUAGES CXX)
+
+      set(CMAKE_CXX_STANDARD 20)
+      set(CMAKE_CXX_STANDARD_REQUIRED ON)
+      set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+      add_executable(hello main.cpp)
+
+  - path: /home/dev/hello/main.cpp
+    owner: dev:dev
+    permissions: "0644"
+    content: |
+      #include <iostream>
+
+      int main() {
+          std::cout << "Hello from the C++ devbox!\n";
+          return 0;
+      }
+
+  # Sensible C++/build-tool defaults in the dev user's shell.
+  - path: /home/dev/.bash_aliases
+    owner: dev:dev
+    permissions: "0644"
+    content: |
+      # Use ccache transparently for gcc/clang.
+      export PATH="/usr/lib/ccache:$PATH"
+      # Default to Ninja generator with CMake.
+      export CMAKE_GENERATOR=Ninja
+      # Always export compile_commands.json for clangd/tooling.
+      export CMAKE_EXPORT_COMPILE_COMMANDS=ON
+
+      alias ll='ls -alF'
+      alias gs='git status'
+      alias build='cmake -B build && cmake --build build'
+
+# ---------------------------------------------------------------------------
+# Commands run on first boot (after packages are installed)
+# ---------------------------------------------------------------------------
+runcmd:
+  # GoogleTest ships as source on Debian/Ubuntu; build and install the libs so
+  # find_package(GTest) works out of the box.
+  - [ bash, -c, "cd /usr/src/googletest && cmake -B build && cmake --build build && cmake --install build" ]
+
+  # fd is installed as 'fdfind' on Ubuntu; provide the conventional 'fd' name.
+  - [ bash, -c, "ln -sf $(command -v fdfind) /usr/local/bin/fd || true" ]
+
+  # Make sure the starter project is owned by the dev user.
+  - [ chown, -R, "dev:dev", /home/dev/hello ]
+
+  # Report the installed toolchain versions to the cloud-init log.
+  - [ bash, -c, "g++ --version; clang++ --version; cmake --version; ninja --version" ]
+
+# ---------------------------------------------------------------------------
+# Final message printed when cloud-init finishes.
+# ---------------------------------------------------------------------------
+final_message: |
+  C++ devbox is ready after $UPTIME seconds.
+  Log in as 'dev' and try:
+    cd ~/hello && cmake -B build && cmake --build build && ./build/hello
